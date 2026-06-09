@@ -1,0 +1,16 @@
+# Environments
+.env
+venv/
+env/
+.venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# LangGraph SQLite/Memory databases (if you add local persistence later)
+*.sqlite3
+*.db
+
+# OS generated files
+.DS_Store
