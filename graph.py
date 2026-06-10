@@ -1,33 +1,11 @@
+from prompts import CURATOR_PROMPT, LATEX_PROMPT
 from langgraph.graph import StateGraph, END
 from state import AgentState
 from langgraph.checkpoint.memory import MemorySaver
 from schemas import ExamCuratorOutput
-from langchain_openai import ChatOpenAI
+
 from langchain_core.prompts import ChatPromptTemplate
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-
-
-llm = ChatOpenAI(
-    model="meta/llama-3.1-70b-instruct", 
-    api_key=os.getenv("NVIDIA_API_KEY"),
-    base_url="https://integrate.api.nvidia.com/v1", temperature=0.2)
-
-structured_curator = llm.with_structured_output(ExamCuratorOutput)
-
-CURATOR_PROMPT = """You are an expert mathematics educator. Your job is to curate a list of clear, high-quality math questions based on the user's request. 
-
-If the user provides feedback on a previously generated list of exercises, update the list according to their instructions 
-(e.g., replacing, adding, or modifying specific questions) while maintaining the structural format.
-
-Current List of Exercises: {current_exercises}
-"""
-
-
+from llms import structured_curator, latex_llm
 
 
 
@@ -61,9 +39,20 @@ def human_review_node(state: AgentState) -> str:
 
 
 def latex_generator_agent(state:AgentState):
-    print("--- GENERATING LATEX ---")
+    print("--- GENERATING LATEX CODE---")
+    exerscises = state.get("exercises", [])
+    compiler_error= state.get("compiler_error", 'None')
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", LATEX_PROMPT),
+        ('human', 'Generate LaTeX code for the following exercises:'),
+    ])
 
-    return {"latex_code": " % LaTeX content goes here"} 
+    chain = prompt | latex_llm
+    response = chain.invoke({"exercises": exerscises, "compiler_error": compiler_error})
+
+    return {"latex_code": response.latex_code,
+            "compiler_error": None}
+ 
 
 
 
@@ -83,7 +72,7 @@ def compiler_node(state:AgentState):
 
 
 
-    
+
     
 
 workflow = StateGraph(AgentState)
