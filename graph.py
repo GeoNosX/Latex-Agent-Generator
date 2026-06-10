@@ -1,22 +1,74 @@
 from langgraph.graph import StateGraph, END
 from state import AgentState
 from langgraph.checkpoint.memory import MemorySaver
+from schemas import ExamCuratorOutput
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+
+
+llm = ChatOpenAI(
+    model="meta/llama-3.1-70b-instruct", 
+    api_key=os.getenv("NVIDIA_API_KEY"),
+    base_url="https://integrate.api.nvidia.com/v1", temperature=0.2)
+
+structured_curator = llm.with_structured_output(ExamCuratorOutput)
+
+CURATOR_PROMPT = """You are an expert mathematics educator. Your job is to curate a list of clear, high-quality math questions based on the user's request. 
+
+If the user provides feedback on a previously generated list of exercises, update the list according to their instructions 
+(e.g., replacing, adding, or modifying specific questions) while maintaining the structural format.
+
+Current List of Exercises: {current_exercises}
+"""
+
+
+
 
 
 def curator_agent(state: AgentState) -> str:
     print("--- CURATING EXERCISES ---")
+    messages=state['messages']
+    current_exercises = state.get("exercises", [])
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", CURATOR_PROMPT),
+        *messages      
 
-    return {"exercises": state.get("exercises", [])}
+    ])
+    chain = prompt | structured_curator
+    response = chain.invoke({"current_exercises": current_exercises})
+
+
+    return {"exercises": [ex.model_dump() for ex in response.exercises],
+        "messages": messages}
+
+
+
+
 
 def human_review_node(state: AgentState) -> str:
     print("--- WAITING FOR USER APPROVAL ---")
 
     return{}
 
+
+
+
+
 def latex_generator_agent(state:AgentState):
     print("--- GENERATING LATEX ---")
 
     return {"latex_code": " % LaTeX content goes here"} 
+
+
+
+
+
 
 def compiler_node(state:AgentState):
     print("--- COMPILING LATEX ---")
@@ -26,6 +78,12 @@ def compiler_node(state:AgentState):
         return {"compiler_error": None}
     else:
         return {"compiler_error": "Compilation failed due to syntax errors."}
+    
+
+
+
+
+    
     
 
 workflow = StateGraph(AgentState)
