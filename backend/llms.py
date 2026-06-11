@@ -1,4 +1,4 @@
-from schemas import ExamCuratorOutput
+from backend.schemas import ExamCuratorOutput
 import os
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
