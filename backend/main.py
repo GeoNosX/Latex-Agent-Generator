@@ -25,3 +25,28 @@ class ResumeRequest(BaseModel):
     thread_id: str
     exercises: List[dict]
     user_approved: bool
+
+@app.post('/api/generate')
+async def generate_exam(request :GenerateRequest):
+    """Initializes a thread and runs the graph until the human review roadblock."""
+    config = {"configurable": {"thread_id": request.thread_id}}
+    initial_state = {
+        "messages": [HumanMessage(content=request.prompt)],
+        "exercises": [],
+        "latex_code": None,
+        "compiler_error": None,
+        "user_approved": False
+    }
+
+    try:
+        graph_app.invoke(initial_state,config=config)
+        current_state = graph_app.get_state(config)
+        return {
+            "status": "paused_for_review",
+            "thread_id": request.thread_id,
+            "exercises": current_state.values.get("exercises", [])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+    
+    
