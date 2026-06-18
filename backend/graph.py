@@ -1,11 +1,11 @@
-from backend.prompts import CURATOR_PROMPT, LATEX_PROMPT
+from prompts import CURATOR_PROMPT, LATEX_PROMPT
 from langgraph.graph import StateGraph, END
-from backend.state import AgentState
+from state import AgentState
 from langgraph.checkpoint.memory import MemorySaver
-from backend.schemas import ExamCuratorOutput
+from schemas import ExamCuratorOutput
 
 from langchain_core.prompts import ChatPromptTemplate
-from backend.llms import structured_curator, latex_llm
+from llms import structured_curator, latex_llm
 import os
 import subprocess
 import tempfile
@@ -41,20 +41,25 @@ def human_review_node(state: AgentState) -> str:
 
 
 
-def latex_generator_agent(state:AgentState):
+def latex_generator_agent(state: AgentState):
     print("--- GENERATING LATEX CODE---")
-    exerscises = state.get("exercises", [])
-    compiler_error= state.get("compiler_error", 'None')
+    exercises = state.get("exercises", [])  
+    compiler_error = state.get("compiler_error", 'None')
+    
     prompt = ChatPromptTemplate.from_messages([
         ("system", LATEX_PROMPT),
-        ('human', 'Generate LaTeX code for the following exercises:'),
+        
+        ('human', 'Generate LaTeX code for the following exercises:\n{exercises}\n\nPrevious compiler errors to fix (if any):\n{compiler_error}'),
     ])
 
     chain = prompt | latex_llm
-    response = chain.invoke({"exercises": exerscises, "compiler_error": compiler_error})
+    response = chain.invoke({"exercises": exercises, "compiler_error": compiler_error})
 
-    return {"latex_code": response.latex_code,
-            "compiler_error": None}
+    
+    return {
+        "latex_code": response.content,
+        "compiler_error": None
+    }
  
 
 
@@ -118,13 +123,7 @@ def compiler_node(state:AgentState):
             print(f"--- SYSTEM ERROR: {str(e)} ---")
             return {"compiler_error": f"System error during compilation: {str(e)}"}
 
-    success = True  # Simulate compilation success
-    if success:
-        return {"compiler_error": None}
-    else:
-        return {"compiler_error": "Compilation failed due to syntax errors."}
     
-
 
 
 
@@ -148,7 +147,7 @@ def route_after_human_review(state: AgentState) -> str:
     return "curator"
 
 
-workflow.add_edge("human_review", 
+workflow.add_conditional_edges("human_review", 
                   route_after_human_review,{
         "latex_generator": "latex_generator",
         "curator": "curator"})
