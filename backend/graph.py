@@ -164,7 +164,7 @@ workflow.add_edge("latex_generator", "compiler")
 def route_after_compilation(state: AgentState):
     if state.get("compiler_error"):
         return "latex_generator"
-    return END  
+    return 'end'  
 
 workflow.add_conditional_edges(
     "compiler",
