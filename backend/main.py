@@ -23,8 +23,9 @@ class GenerateRequest(BaseModel):
 
 class ResumeRequest(BaseModel):
     thread_id: str
-    exercises: List[dict]
+    exercises: Optional[List[dict]] = None
     user_approved: bool
+    feedback: Optional[str] = None
 
 @app.post('/api/generate')
 async def generate_exam(request :GenerateRequest):
@@ -69,32 +70,53 @@ async def get_status(thread_id: str):
         "next_step": current_state.next  # Tells us if the graph is currently interrupted
     }
 
-@app.post('/api/resume')
-async def resume_graph (request: ResumeRequest):
+@app.post("/api/resume")
+async def resume_graph(request: ResumeRequest):
     """Overwrites state with human updates and signals the graph to continue."""
     config = {"configurable": {"thread_id": request.thread_id}}
+    
+    
+    state_update = {
+        "user_approved": request.user_approved
+    }
+    
+    
+    if request.exercises:
+        state_update["exercises"] = request.exercises
+        
+    
+    if request.feedback:
+        current_state = graph_app.get_state(config)
+        existing_messages = current_state.values.get("messages", [])
+        
+        
+        existing_messages.append(HumanMessage(content=request.feedback))
+        state_update["messages"] = existing_messages
 
-    graph_app.update_state(config, 
-                           
-                           {'exercises': request.exercises,
-                            'user_approved': request.user_approved})
-
+    
+    graph_app.update_state(config, state_update)
+    
     try:
+        
         graph_app.invoke(None, config=config)
+        
+        
         final_state = graph_app.get_state(config)
-
-
+        
+        
         if "human_review" in final_state.next:
             return {
                 "status": "paused_for_review",
                 "exercises": final_state.values.get("exercises", []),
-                "message": "Exercises adjusted based on your feedback. Ready for another look."
+                "message": "AI updated the exercises based on your feedback."
             }
+            
+        
         return {
-                "status": "completed",
-                "latex_code": final_state.values.get("latex_code"),
-                "compiler_error": final_state.values.get("compiler_error")
-                }
+            "status": "completed",
+            "latex_code": final_state.values.get("latex_code"),
+            "compiler_error": final_state.values.get("compiler_error")
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Resuming failed: {str(e)}")
 
