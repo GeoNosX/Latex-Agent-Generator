@@ -67,61 +67,68 @@ def latex_generator_agent(state: AgentState):
 
 
 
-def compiler_node(state:AgentState):
+def compiler_node(state: AgentState):
     print("--- COMPILING LATEX ---")
     latex_code = state.get("latex_code")
 
     if not latex_code:
         return {"compiler_error": "System Error: No LaTeX code provided to compiler."}
     
-    with tempfile.TemporaryDirectory() as temp_dir:
-        tex_file_path = os.path.join(temp_dir, "document.tex")
-        with open(tex_file_path, "w", encoding="utf-8") as f:
-            f.write(latex_code)
+    output_dir = os.path.join(os.getcwd(), "saved_exams")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    
+    tex_file_path = os.path.join(output_dir, "latest_exam.tex")
+    
+    
+    with open(tex_file_path, "w", encoding="utf-8") as f:
+        f.write(latex_code)
 
-        try:
+    
+    try:
+        result = subprocess.run(
+            [
+                "pdflatex", 
+                "-interaction=nonstopmode", 
+                "-output-directory", output_dir, 
+                tex_file_path
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15  
+        )
+        
+        if result.returncode == 0:
+            print("--- COMPILATION SUCCESSFUL ---")
+            return {"compiler_error": None}
+        else:
+            print("--- COMPILATION FAILED: EXTRACTING LOGS ---")
             
-            result = subprocess.run(
-                [
-                    "pdflatex", 
-                    "-interaction=nonstopmode", 
-                    "-output-directory", temp_dir, 
-                    tex_file_path
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=15  # Prevent infinite loops
-            )
-            if result.returncode == 0:
-                print("--- COMPILATION SUCCESSFUL ---")
-                return {"compiler_error": None}
-            else:
-                print("--- COMPILATION FAILED: EXTRACTING LOGS ---")
-                
-                log_path = os.path.join(temp_dir, "document.log")
-                error_msg = "Unknown compilation error."
-
-                if os.path.exists(log_path):
-                    with open(log_path, "r", encoding="utf-8") as log_file:
-                        log_content = log_file.read()
-                        error_lines = [line for line in log_content.split('\n') if line.startswith('!')]
-                        if error_lines:
-                            # Send the first few errors to avoid overwhelming the token limit
-                            error_msg = "\n".join(error_lines[:5]) 
-                        else:
-                            # Fallback to standard output if log parsing fails
-                            error_msg = result.stdout[-500:]
-
-                print(f"Error captured:\n{error_msg}")
-                return {"compiler_error": f"LaTeX Error to fix:\n{error_msg}"}
             
-        except subprocess.TimeoutExpired:
-            print("--- COMPILATION TIMED OUT ---")
-            return {"compiler_error": "Compilation timed out. The code might have an infinite loop or missing package."}
-        except Exception as e:
-            print(f"--- SYSTEM ERROR: {str(e)} ---")
-            return {"compiler_error": f"System error during compilation: {str(e)}"}
+            log_path = os.path.join(output_dir, "latest_exam.log")
+            error_msg = "Unknown compilation error."
+
+            if os.path.exists(log_path):
+                with open(log_path, "r", encoding="utf-8") as log_file:
+                    log_content = log_file.read()
+                    error_lines = [line for line in log_content.split('\n') if line.startswith('!')]
+                    if error_lines:
+                        
+                        error_msg = "\n".join(error_lines[:5]) 
+                    else:
+                        
+                        error_msg = result.stdout[-500:]
+
+            print(f"Error captured:\n{error_msg}")
+            return {"compiler_error": f"LaTeX Error to fix:\n{error_msg}"}
+            
+    except subprocess.TimeoutExpired:
+        print("--- COMPILATION TIMED OUT ---")
+        return {"compiler_error": "Compilation timed out. The code might have an infinite loop or missing package."}
+    except Exception as e:
+        print(f"--- SYSTEM ERROR: {str(e)} ---")
+        return {"compiler_error": f"System error during compilation: {str(e)}"}
 
     
 
