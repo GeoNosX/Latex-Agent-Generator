@@ -14,3 +14,63 @@ __pycache__/
 
 # OS generated files
 .DS_Store
+saved_exams
+
+# =========================
+# FRONTEND (React / Node)
+# =========================
+# Dependencies (NEVER commit this!)
+node_modules/
+
+# Production build output
+dist/
+dist-ssr/
+
+# Vite/Environment variables
+.env
+.env.local
+.env.*.local
+
+# npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# BACKEND (Python / FastAPI)
+# =========================
+# Virtual Environments (NEVER commit this!)
+venv/
+env/
+research_env/
+.venv/
+
+# Compiled Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# YOUR CUSTOM APP DATA
+# =========================
+# Do not commit the generated PDFs and LaTeX logs!
+backend/saved_exams/
+*.log
+
+# =========================
+# OS & EDITOR FILES
+# =========================
+# Mac OS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# VS Code
+.vscode/
+!.vscode/settings.json
