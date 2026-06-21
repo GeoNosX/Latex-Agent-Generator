@@ -90,13 +90,16 @@ def compiler_node(state: AgentState):
             [
                 "pdflatex", 
                 "-interaction=nonstopmode", 
+                "-halt-on-error",
                 "-output-directory", output_dir, 
                 tex_file_path
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=15  
+            encoding="utf-8",    
+            errors="replace",
+            timeout=60  
         )
         
         if result.returncode == 0:
@@ -110,7 +113,7 @@ def compiler_node(state: AgentState):
             error_msg = "Unknown compilation error."
 
             if os.path.exists(log_path):
-                with open(log_path, "r", encoding="utf-8") as log_file:
+                with open(log_path, "r", encoding="utf-8",errors="replace") as log_file:
                     log_content = log_file.read()
                     error_lines = [line for line in log_content.split('\n') if line.startswith('!')]
                     if error_lines:
@@ -156,7 +159,8 @@ workflow.add_edge("latex_generator", "compiler")
 
 def route_after_compilation(state: AgentState):
     if state.get("compiler_error"):
-        return "latex_generator" 
+        print("Compilation failed, sending to human review safety valve...")
+        return "human_review"   
     return "human_review"        
 
 workflow.add_conditional_edges(
