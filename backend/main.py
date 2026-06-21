@@ -1,3 +1,5 @@
+from fastapi.staticfiles import StaticFiles
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -16,6 +18,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+os.makedirs("saved_exams", exist_ok=True)
+
+app.mount("/pdfs", StaticFiles(directory="saved_exams"), name="pdfs")
 
 class GenerateRequest(BaseModel):
     prompt: str

@@ -140,41 +140,48 @@ def compiler_node(state: AgentState):
 workflow = StateGraph(AgentState)
 
 workflow.add_node("curator", curator_agent)
-workflow.add_node("human_review", human_review_node)
 workflow.add_node("latex_generator", latex_generator_agent)
 workflow.add_node("compiler", compiler_node)
+workflow.add_node("human_review", human_review_node)
+
 
 workflow.set_entry_point("curator")
 
-workflow.add_edge("curator", "human_review")
 
-def route_after_human_review(state: AgentState) -> str:
-    if state.get("user_approved"):
-        return "latex_generator"
-    return "curator"
+workflow.add_edge("curator", "latex_generator")
 
-
-workflow.add_conditional_edges("human_review", 
-                  route_after_human_review,{
-        "latex_generator": "latex_generator",
-        "curator": "curator"})
 
 workflow.add_edge("latex_generator", "compiler")
 
+
 def route_after_compilation(state: AgentState):
     if state.get("compiler_error"):
-        return "latex_generator"
-    return 'end'  
+        return "latex_generator" 
+    return "human_review"        
 
 workflow.add_conditional_edges(
     "compiler",
     route_after_compilation,
     {
         "latex_generator": "latex_generator",
-        "end": END
+        "human_review": "human_review"
     }
 )
 
 
-memory=MemorySaver()
-app=workflow.compile(checkpointer=memory, interrupt_before=["human_review"])
+def route_after_human_review(state: AgentState) -> str:
+    if state.get("user_approved"):
+        return "end"     
+    return "curator"     
+
+workflow.add_conditional_edges(
+    "human_review", 
+    route_after_human_review,
+    {
+        "end": END,
+        "curator": "curator"
+    }
+)
+
+memory = MemorySaver()
+app = workflow.compile(checkpointer=memory, interrupt_before=["human_review"])
