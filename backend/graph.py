@@ -9,24 +9,77 @@ from llms import structured_curator, latex_llm
 import os
 import subprocess
 import tempfile
+from langchain_tavily import TavilySearch
+from langchain_core.output_parsers import StrOutputParser
+
+# My Tavily search
+tavily_key = os.getenv("TAVILY_API_KEY")
 
 
 
-def curator_agent(state: AgentState) -> str:
-    print("--- CURATING EXERCISES ---")
-    messages=state['messages']
+
+def researcher_node(state: AgentState):
+    print("--- 🧠 OPTIMIZING SEARCH QUERY ---")
+    user_prompt = state.get("prompt", "")
+    
+    # 1. Have the LLM write the perfect search query
+    query_prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are an expert academic research librarian. The user wants to build an exam based on the following topic. Write a single, highly optimized web search query to find official syllabuses, curriculum standards, and past test questions for this specific topic. Return ONLY the search query text. No quotes, no preamble."),
+        ("human", "{topic}")
+    ])
+    
+    query_chain = query_prompt | latex_llm | StrOutputParser()
+    optimized_query = query_chain.invoke({"topic": user_prompt})
+    
+    print(f"    Target Query: {optimized_query}")
+
+    # 2. Run the search using the AI's custom query
+    print("--- 🌐 RESEARCHING ON THE WEB ---")
+    search_tool = TavilySearch(max_results=3, api_key=tavily_key)
+    results = search_tool.invoke({"query": optimized_query})
+    
+    research_notes = "Here is the internet research gathered for this topic:\n\n"
+
+    # Safely parse the Tavily output
+    if isinstance(results, str):
+        research_notes += results
+    elif isinstance(results, dict) and "results" in results:
+        for res in results["results"]:
+            research_notes += f"- Source: {res.get('url', 'Unknown')}\n  Info: {res.get('content', '')}\n\n"
+    elif isinstance(results, list):
+        for res in results:
+            research_notes += f"- Source: {res.get('url', 'Unknown')}\n  Info: {res.get('content', '')}\n\n"
+    else:
+        research_notes += str(results)
+
+    return {"research_context": research_notes}
+
+
+def curator_agent(state: AgentState):
+    print("--- 📝 CURATING EXERCISES ---")
+    messages = state.get('messages', [])
     current_exercises = state.get("exercises", [])
+    
+    
+    research_context = state.get("research_context", "No internet research was found.")
+
     prompt = ChatPromptTemplate.from_messages([
         ("system", CURATOR_PROMPT),
         *messages      
-
     ])
+    
     chain = prompt | structured_curator
-    response = chain.invoke({"current_exercises": current_exercises})
+    
+    
+    response = chain.invoke({
+        "current_exercises": current_exercises,
+        "research_context": research_context
+    })
 
-
-    return {"exercises": [ex.model_dump() for ex in response.exercises],
-        "messages": messages}
+    return {
+        "exercises": [ex.model_dump() for ex in response.exercises],
+        "messages": messages
+    }
 
 
 
@@ -142,14 +195,16 @@ def compiler_node(state: AgentState):
 
 workflow = StateGraph(AgentState)
 
+workflow.add_node("researcher", researcher_node)
 workflow.add_node("curator", curator_agent)
 workflow.add_node("latex_generator", latex_generator_agent)
 workflow.add_node("compiler", compiler_node)
 workflow.add_node("human_review", human_review_node)
 
 
-workflow.set_entry_point("curator")
+workflow.set_entry_point("researcher")
 
+workflow.add_edge("researcher", "curator")
 
 workflow.add_edge("curator", "latex_generator")
 

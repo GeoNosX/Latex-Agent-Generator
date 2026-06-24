@@ -13,3 +13,5 @@ class AgentState(TypedDict):
 
     user_approved: Optional[bool]
 
+    research_context: str
+

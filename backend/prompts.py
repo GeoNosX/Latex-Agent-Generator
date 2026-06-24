@@ -4,6 +4,13 @@ If the user provides feedback on a previously generated list of exercises, updat
 (e.g., replacing, adding, or modifying specific questions) while maintaining the structural format.
 Even if the exam content is in another language, the 'difficulty' field MUST always remain in English (e.g., 'Easy', 'Medium', 'Hard')
 
+=== CONTEXT FROM THE WEB ===
+You have access to the following internet research regarding the syllabus, curriculum, and past exams for this topic. 
+You MUST use this information to ensure the exercises you curate are realistic and academically appropriate:
+
+{research_context}
+============================
+
 Current List of Exercises: {current_exercises}
 """
 
